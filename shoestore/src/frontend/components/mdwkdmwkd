@@ -1,0 +1,97 @@
+import React, { useEffect, useState } from 'react';
+
+const Order = (props) => {
+    const [orders, setOrders] = useState([]);
+    const [productsByOrder, setProductsByOrder] = useState({});
+    const [loading, setLoading] = useState(false);
+    const auth = localStorage.getItem("user");
+    const userId = auth ? JSON.parse(auth)._id : null;
+
+    useEffect(() => {
+        async function getCartItems() {
+            try {
+                setLoading(true);
+                let result = await fetch(`http://localhost:5000/userOrder/${userId}`);
+                result = await result.json();
+                setOrders(result);
+            } catch (error) {
+                console.error('Error fetching cart items:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        if (userId) {
+            getCartItems();
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        async function fetchProducts() {
+            if (orders.length === 0) return;
+
+            const productsMap = {};
+            for (const order of orders) {
+                const productIds = Object.keys(order.productIds); // Convert object keys to an array
+                const promises = productIds.map(async productId => {
+                    let result = await fetch(`http://localhost:5000/product/${productId}`);
+                    return await result.json();
+                });
+                productsMap[order._id] = await Promise.all(promises);
+            }
+            setProductsByOrder(productsMap);
+        }
+
+        fetchProducts();
+    }, [orders]);
+
+    if (loading) {
+        return <div>Loading...</div>;
+    }
+
+    return (
+        <div className='order-container ' style={{ minHeight: "100vh" }}>
+            {orders.map((order) => (
+                <div className="card order-card" key={order._id}>
+                    <div className="order-header">Purchase Receipt</div>
+                    <div className="order-info">
+                        <div className="row">
+                            <div className="col-7">
+                                <span className="order-heading">Date</span><br />
+                                <span>{order.Date ? order.Date.substring(0, 10) : 'N/A'}</span>
+                            </div>
+                            <div className="col-5 pull-right">
+                                <span className="order-heading">Order ID</span><br />
+                                <span>{order._id}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="order-products">
+                        {productsByOrder[order._id]?.map((product, index) => (
+                            <div className="row product-row" key={index}>
+                                <div className="col-9">
+                                    <span className="product-name">{product.name}</span>
+                                </div>
+                                <div className="col-3">
+                                    <span className="product-price">£{product.price}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="order-footer">
+                        <div className="row">
+                            <div className="col-2">
+                                <img className="img-fluid" src="https://i.imgur.com/YBWc55P.png" alt="logo" />
+                            </div>
+                            <div className="col-10">
+                                Want any help? Please &nbsp;<a href="#">contact us</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+export default Order;
